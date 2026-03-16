@@ -108,7 +108,7 @@ def _find_files(dirpath: Union[str, Path], exts: Union[str, list[str]] = EXTDEFA
 
 
 def _from_pydict(data: Dict[str, str]) -> str:
-    return '&>' + '\n&>'.join(f"{k}:{v}" for k, v in data.items())
+    return '&>' + '\n&>'.join(f"{k.strip()}:{v.strip()}" for k, v in data.items())
 
 
 def _to_pydict(text: str) -> Dict[str, str]:
