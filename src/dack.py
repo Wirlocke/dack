@@ -3,7 +3,7 @@ import platform
 import tempfile
 import warnings
 from pathlib import Path
-from typing import Dict, Union
+from typing import Any, Dict, Union
 
 
 EXTDEFAULT = '.cfg'
@@ -111,8 +111,8 @@ def _find_files(dirpath: Union[str, Path], exts: Union[str, list[str]] = EXTDEFA
 # Saving Functions
 # =========================
 
-def from_pydict(data: Dict[str, str]) -> str:
-    return '&>' + '\n&>'.join(f"{k.strip()}:{v.strip()}" for k, v in data.items())
+def from_pydict(data: Dict[str, Any]) -> str:
+    return '&>' + '\n&>'.join(f"{k.strip()}:{str(v).strip()}" for k, v in data.items())
 
 
 def saveas(data: Dict[str, str], dirpath: Union[str, Path], filestem: str, fileext: str = EXTDEFAULT, atomic=True, mode: int = 0o600):
