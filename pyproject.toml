@@ -13,7 +13,7 @@ authors = [
 ]
 
 [project.urls]
-Repository = "https://github.com/Wirlocke/Dack"
+Repository = "https://github.com/Wirlocke/dack"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dack.py"]
