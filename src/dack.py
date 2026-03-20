@@ -7,13 +7,23 @@ from typing import Any, Dict, Union
 
 
 EXTDEFAULT = '.cfg'
+DIR_MODEDEFAULT = 0o700
+FILE_MODEDEFAULT = 0o600
+
+PATHORSTR = Union[Path, str]
+DACKFILES = Dict[str, Dict[str, str]]
+DACKSUBDIRS = Dict[str, PATHORSTR]
+DACKEXTS = Dict[str, str]
 
 
 # =========================
 # Helper Functions
 # =========================
 
-def _ensure_dir(dirpath, mkdir=True, mode: int = 0o700) -> bool:
+def _ensure_dir(dirpath: PATHORSTR,
+                mkdir: bool = True,
+                mode: int = DIR_MODEDEFAULT) -> bool:
+
     path = Path(dirpath).expanduser().resolve()
 
     if path.exists():
@@ -42,34 +52,9 @@ def _ensure_dir(dirpath, mkdir=True, mode: int = 0o700) -> bool:
         return False
 
 
-def _ensure_file(file: Union[str, Path]) -> Path:
-    if not file:
-        raise ValueError(
-            f"Invalid file (file name or path cannot be empty or None)"
-        )
-
-    filepath = Path(file)
-    filename = filepath.name
-    filestem, period, fileext = filename.rpartition('.')
-    if not period:
-        filestem = fileext
-        fileext = EXTDEFAULT
-    if not filestem:
-        raise ValueError(
-            f"Invalid filestem (filestem cannot be empty or None)"
-        )
-    if not fileext:
-        fileext = EXTDEFAULT
-    else:
-        fileext = _ensure_ext(period + fileext)
-    filename = filestem + fileext
-
-    return filepath.parent / filename
-
-
 def _ensure_ext(extension: str) -> str:
-    if not extension or not extension.strip():
-        extension = EXTDEFAULT
+    if extension == EXTDEFAULT or not extension or not extension.strip():
+        return EXTDEFAULT
     extension = extension.strip().lower()
     if extension[0] != '.':
         extension = '.' + extension
@@ -91,19 +76,51 @@ def _ensure_filename(filename: str) -> str:
     return safename
 
 
-def _find_files(dirpath: Union[str, Path], exts: Union[str, list[str]] = EXTDEFAULT) -> list[Path]:
+def _ensure_file(file: PATHORSTR) -> Path:
+    if not file:
+        raise ValueError(
+            f"Invalid file (file name or path cannot be empty or None)"
+        )
+
+    filepath = Path(file)
+    if not filepath.is_file:
+        raise ValueError(
+            f"Invalid file (is not a file)"
+        )
+
+    filestem = filepath.stem
+    fileext = filepath.suffix
+
+    if not fileext or fileext == '.':
+        fileext = EXTDEFAULT
+    if not filestem:
+        raise ValueError(
+            f"Invalid file (file name cannot be empty or None)"
+        )
+
+    return filepath.parent / (filestem + fileext)
+
+
+def _find_files(dirpath: PATHORSTR,
+                exts: Union[str, list[str]] = EXTDEFAULT,
+                recursive: bool = True) -> list[Path]:
+
     dirpath = Path(dirpath)
     if not _ensure_dir(dirpath, mkdir=False):
         return []
     if isinstance(exts, list):
-        exts = [_ensure_ext(ext) for ext in exts]
-        exts = list(set(exts))
+        exts = list(set(_ensure_ext(ext) for ext in exts))
     else:
-        exts = [_ensure_ext(str(exts))]
+        exts = [_ensure_ext(exts)]
 
     filepaths: list[Path] = []
-    for ext in exts:
-        filepaths.extend(dirpath.rglob(f'*{ext}'))
+    if recursive:
+        for ext in exts:
+            filepaths.extend(dirpath.rglob(f'*{ext}', recurse_symlinks=True))
+    else:
+        for ext in exts:
+            filepaths.extend(dirpath.glob(f'*{ext}'))
+
     return filepaths
 
 
@@ -115,7 +132,13 @@ def from_pydict(data: Dict[str, Any]) -> str:
     return '&>' + '\n&>'.join(f"{k.strip()}:{str(v).strip()}" for k, v in data.items())
 
 
-def saveas(data: Dict[str, str], dirpath: Union[str, Path], filestem: str, fileext: str = EXTDEFAULT, atomic=True, mode: int = 0o600):
+def saveas(data: Dict[str, str],
+           dirpath: PATHORSTR,
+           filestem: str,
+           fileext: str = EXTDEFAULT,
+           atomic: bool = True,
+           mode: int = FILE_MODEDEFAULT):
+
     dirpath = Path(dirpath)
     fileext = _ensure_ext(fileext)
     filename = _ensure_filename(filestem + fileext)
@@ -123,14 +146,25 @@ def saveas(data: Dict[str, str], dirpath: Union[str, Path], filestem: str, filee
     save(data, filepath, atomic, mode)
 
 
-def savefile(data: Dict[str, str], dirpath: Union[str, Path], filename: str, atomic=True, mode: int = 0o600):
+def savefile(data: Dict[str, str],
+             dirpath: PATHORSTR,
+             filename: str,
+             atomic: bool = True,
+             mode: int = FILE_MODEDEFAULT):
+
     dirpath = Path(dirpath)
     filename = _ensure_filename(filename)
     filepath = dirpath / filename
     save(data, filepath, atomic, mode)
 
 
-def savebatch(dataset: Dict[str, Dict[str, str]], dirpath: Union[str, Path], subdirpath: Dict[str, Union[str, Path]] = {}, fileexts: Dict[str, str] = {}, atomic=True, mode: int = 0o600):
+def savebatch(dataset: DACKFILES,
+              dirpath: PATHORSTR,
+              subdirpath: DACKSUBDIRS = {},
+              fileexts: DACKEXTS = {},
+              atomic: bool = True,
+              mode: int = FILE_MODEDEFAULT):
+
     dirpath = Path(dirpath)
     for datakey in dataset:
         curr_subdirpath = Path("")
@@ -144,7 +178,11 @@ def savebatch(dataset: Dict[str, Dict[str, str]], dirpath: Union[str, Path], sub
         save(data, filepath, atomic, mode)
 
 
-def save(data: Dict[str, str], filepath: Union[str, Path], atomic=True, mode: int = 0o600):
+def save(data: Dict[str, str],
+         filepath: PATHORSTR,
+         atomic: bool = True,
+         mode: int = FILE_MODEDEFAULT):
+
     filepath = _ensure_file(filepath)
     _ensure_dir(filepath.parent)
 
@@ -205,25 +243,31 @@ def to_pydict(text: str) -> Dict[str, str]:
     return dackdict
 
 
-def loadfrom(dirpath: Union[str, Path], filestem: str, fileext: str = EXTDEFAULT) -> Dict[str, str]:
+def loadfrom(dirpath: PATHORSTR,
+             filestem: str,
+             fileext: str = EXTDEFAULT) -> Dict[str, str]:
+
     dirpath = Path(dirpath)
     filepath = dirpath / (filestem + fileext)
     return load(filepath)
 
 
-def loadfile(dirpath: Union[str, Path], filename: str) -> Dict[str, str]:
+def loadfile(dirpath: PATHORSTR,
+             filename: str) -> Dict[str, str]:
+
     dirpath = Path(dirpath)
     filepath = dirpath / filename
     return load(filepath)
 
 
-def loadbatch(dirpath: Union[str, Path], exts: Union[str, list[str]] = EXTDEFAULT) -> tuple[Dict[str, Dict[str, str]], Dict[str, Union[str, Path]], Dict[str, str]]:
+def loadbatch(dirpath: PATHORSTR,
+              exts: Union[str, list[str]] = EXTDEFAULT,
+              recursive: bool = True) -> tuple[DACKFILES, DACKSUBDIRS, DACKEXTS]:
+
     dirpath = Path(dirpath)
     _ensure_dir(dirpath)
 
-    filepaths = _find_files(dirpath, exts)
-    if not filepaths:
-        return {}, {}, {}
+    filepaths = _find_files(dirpath, exts, recursive)
 
     batchfiles = {}
     batchsubdir = {}
@@ -236,7 +280,7 @@ def loadbatch(dirpath: Union[str, Path], exts: Union[str, list[str]] = EXTDEFAUL
     return batchfiles, batchsubdir, batchexts
 
 
-def load(filepath: Union[str, Path]) -> Dict[str, str]:
+def load(filepath: PATHORSTR) -> Dict[str, str]:
     filepath = Path(filepath)
     if not _ensure_dir(filepath.parent, mkdir=False):
         return {}

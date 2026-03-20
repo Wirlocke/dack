@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dack"
-version = "0.1.2"
+version = "0.1.3"
 description = "Dack is a file format that can be stored in any text file"
 readme = "README.md"
 license = { file = "LICENSE" }

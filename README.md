@@ -26,5 +26,5 @@ Dack has 10 public functions that are outlined here:
 `dack.save` `dack.load` will save or load a dict to or from a file using that file's path.  
 `dack.saveas` `dack.savefile` `dack.loadfrom` `dack.loadfile` are like overrides for the save and load functions;  
 `saveas` and `loadfrom` only need the name of the file, `savefile` and `loadfile` needs the file name with it's extension.  
-`dack.savebatch` will save a list of dictionaries as separate files in a directory.  
-`dack.loadbatch` will recursively load files in a directory and return a list of dictionaries.
+`dack.savebatch` will save a dict of dictionaries as separate files in a directory.  
+`dack.loadbatch` will load files in a directory and return a dict of dictionaries, option to load recursively or not.
